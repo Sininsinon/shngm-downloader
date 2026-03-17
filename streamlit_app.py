@@ -151,12 +151,13 @@ if st.session_state.manga_data:
 
                 status_text.success(f"✅ Berhasil memproses {len(selected)} chapter!")
                 
+                def get_data():
+                    return zip_buffer.getvalue()
+                
                 st.download_button(
-                    label=f"📥 DOWNLOAD {final_filename}",
-                    data=main_zip_buffer.getvalue(),
-                    file_name=final_filename,
+                    label="📥 DOWNLOAD SEKARANG",
+                    data=get_data,  # Memberikan fungsi, bukan data mentah
+                    file_name=final_zip_name,
                     mime="application/zip",
                     use_container_width=True
                 )
-            except Exception as e:
-                st.error(f"Terjadi kesalahan: {e}")
