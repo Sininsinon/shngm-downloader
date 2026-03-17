@@ -8,10 +8,26 @@ import time
 from urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
 
-# --- KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="SHNGM Downloader Pro (CBZ Edition)", page_icon="⚡", layout="wide")
+# --- 1. KONFIGURASI HALAMAN ---
+st.set_page_config(page_title="SHNGM CBZ Downloader", page_icon="⚡", layout="wide")
 
-# Setup Session dengan Retry Strategy
+# CSS untuk Fixed Footer (Tombol Download tetap di bawah)
+st.markdown("""
+    <style>
+    .main-content { margin-bottom: 150px; }
+    div[data-testid="stVerticalBlock"] > div:has(div.fixed-footer) {
+        position: fixed;
+        bottom: 0; left: 0; width: 100%;
+        background-color: white;
+        z-index: 999;
+        padding: 15px 5%;
+        border-top: 1px solid #ddd;
+        box-shadow: 0 -5px 10px rgba(0,0,0,0.1);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Setup Session agar koneksi stabil
 def create_session():
     session = requests.Session()
     retry_strategy = Retry(
@@ -26,35 +42,31 @@ def create_session():
 
 session = create_session()
 
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    "Referer": "https://shngm.io/",
-    "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "en-US,en;q=0.9",
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Referer": "https://shngm.io/"
 }
 
-# --- FUNGSI UTILITY ---
+# --- 2. UTILS ---
 def sanitize_filename(name):
     return re.sub(r'[\\/*?:"<>|]', "", name).strip().replace(" ", "_")
 
 def extract_number(text):
-    nums = re.findall(r"[-+]?\d*\.\d+|\d+", text)
-    if nums:
-        val = float(nums[0])
-        return int(val) if val.is_integer() else val
-    return 0
+    nums = re.findall(r"(\d+\.?\d*)", str(text))
+    return float(nums[0]) if nums else 0
 
 def fetch_image(url):
-    """Download gambar sebagai bytes mentah (sangat cepat)"""
     try:
-        r = session.get(url, headers=headers, timeout=20)
+        r = session.get(url, headers=HEADERS, timeout=20)
         return r.content if r.status_code == 200 else None
     except:
         return None
 
-# --- LOGIKA SESSION STATE ---
+# --- 3. SESSION STATE ---
 if 'manga_data' not in st.session_state:
     st.session_state.manga_data = None
+if 'sel_ch' not in st.session_state:
+    st.session_state.sel_ch = []
 
 def select_all():
     if st.session_state.manga_data:
@@ -63,101 +75,100 @@ def select_all():
 def deselect_all():
     st.session_state.sel_ch = []
 
-# --- UI HEADER ---
+# --- 4. UI HEADER ---
 st.title("⚡ SHNGM CBZ Downloader")
-st.caption("Mendownload chapter dalam format .cbz (Jauh lebih cepat tanpa konversi PDF)")
 
-col_input, col_search = st.columns([4, 1])
-with col_input:
-    manga_id_input = st.text_input("Manga ID", placeholder="Masukkan ID Manga...", label_visibility="collapsed")
-with col_search:
-    search_btn = st.button("🔍 CARI MANGA", use_container_width=True, type="primary")
+col_in, col_sr = st.columns([4, 1])
+m_id = col_in.text_input("Manga ID", placeholder="Masukkan ID Manga...", label_visibility="collapsed")
 
-if search_btn and manga_id_input:
-    try:
-        with st.spinner("Sedang mencari manga..."):
-            m_res = session.get(f"https://api.shngm.io/v1/manga/detail/{manga_id_input}", headers=headers).json()
-            title = m_res["data"]["title"]
-            
-            c_res = session.get(f"https://api.shngm.io/v1/chapter/{manga_id_input}/list?page=1&page_size=1500&sort_by=chapter_number&sort_order=asc", headers=headers).json()
-            chapters = c_res["data"]
-            
-            chapter_map = {f"Chapter {c['chapter_number']}": c["chapter_id"] for c in chapters}
-            chapter_labels = sorted(list(chapter_map.keys()), key=extract_number)
+if col_sr.button("🔍 CARI MANGA", use_container_width=True, type="primary"):
+    if m_id:
+        try:
+            with st.spinner("Mencari manga..."):
+                m_res = session.get(f"https://api.shngm.io/v1/manga/detail/{m_id}", headers=HEADERS).json()
+                title = m_res["data"]["title"]
+                c_res = session.get(f"https://api.shngm.io/v1/chapter/{m_id}/list?page=1&page_size=1500", headers=HEADERS).json()
+                chapters = sorted(c_res["data"], key=lambda x: float(x['chapter_number']))
+                
+                st.session_state.manga_data = {
+                    "title": title,
+                    "map": {f"Chapter {c['chapter_number']}": c["chapter_id"] for c in chapters},
+                    "labels": [f"Chapter {c['chapter_number']}" for c in chapters]
+                }
+                st.session_state.sel_ch = []
+        except:
+            st.error("Gagal! Pastikan ID benar.")
 
-            st.session_state.manga_data = {
-                "title": title,
-                "map": chapter_map,
-                "labels": chapter_labels
-            }
-            st.session_state.sel_ch = [] 
-    except Exception as e:
-        st.error(f"Gagal memuat data. Pastikan ID benar.")
-
+# --- 5. DAFTAR CHAPTER ---
 if st.session_state.manga_data:
     m_info = st.session_state.manga_data
-    st.divider()
+    st.markdown('<div class="main-content">', unsafe_allow_html=True)
     st.subheader(f"📖 {m_info['title']}")
 
-    col_all, col_none = st.columns([1, 1])
-    with col_all: st.button("✅ Pilih Semua", on_click=select_all, use_container_width=True)
-    with col_none: st.button("❌ Hapus Semua", on_click=deselect_all, use_container_width=True)
+    c1, c2 = st.columns(2)
+    with c1: st.button("✅ Pilih Semua", on_click=select_all, use_container_width=True)
+    with c2: st.button("❌ Hapus Semua", on_click=deselect_all, use_container_width=True)
 
-    selected = st.multiselect("Daftar Chapter:", m_info['labels'], key="sel_ch")
+    selected = st.multiselect("Pilih Chapter:", m_info['labels'], key="sel_ch")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    if st.button("🚀 MULAI DOWNLOAD (.CBZ)", type="primary", use_container_width=True):
-        if not selected:
-            st.error("Pilih minimal satu chapter!")
-        else:
-            # Buffer utama untuk file ZIP yang berisi kumpulan .cbz
-            main_zip_buffer = BytesIO()
-            sorted_selected = sorted(selected, key=extract_number)
-            
-            ch_nums = [extract_number(s) for s in sorted_selected]
-            range_str = f"Ch_{ch_nums[0]}" if len(ch_nums) == 1 else f"Ch_{ch_nums[0]}-{ch_nums[-1]}"
-            final_filename = f"{sanitize_filename(m_info['title'])}_{range_str}.zip"
+    # --- 6. FIXED FOOTER (PROSES & DOWNLOAD) ---
+    with st.container():
+        st.markdown('<div class="fixed-footer">', unsafe_allow_html=True)
+        col_btn, col_status = st.columns([1, 2])
+        
+        btn_start = col_btn.button("🚀 MULAI DOWNLOAD (.CBZ)", type="primary", use_container_width=True)
+        
+        status_area = col_status.empty()
+        prog_bar = col_status.empty()
+        dl_area = col_status.empty()
 
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-
-            try:
-                with zipfile.ZipFile(main_zip_buffer, "w", zipfile.ZIP_DEFLATED) as main_zip:
-                    for i, ch_label in enumerate(sorted_selected):
-                        status_text.text(f"⏳ Mendownload {ch_label} (Tanpa PDF, langsung CBZ)...")
-                        
-                        ch_id = m_info['map'][ch_label]
-                        ch_detail_res = session.get(f"https://api.shngm.io/v1/chapter/detail/{ch_id}", headers=headers, timeout=30)
-                        ch_detail = ch_detail_res.json()["data"]
-                        
-                        urls = [ch_detail["base_url"] + ch_detail["chapter"]["path"] + img for img in ch_detail["chapter"]["data"]]
-
-                        # Download gambar secara paralel
-                        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-                            img_results = list(executor.map(fetch_image, urls))
-
-                        # BUAT FILE CBZ (Sebenarnya ZIP berisi gambar mentah)
-                        cbz_buffer = BytesIO()
-                        with zipfile.ZipFile(cbz_buffer, "w", zipfile.ZIP_STORED) as cbz:
-                            for idx, img_bytes in enumerate(img_results):
-                                if img_bytes:
-                                    # Penamaan file di dalam CBZ: 001.jpg, 002.jpg, dst
-                                    cbz.writestr(f"{idx+1:03d}.jpg", img_bytes)
-                        
-                        # Masukkan file .cbz ke dalam ZIP utama
-                        main_zip.writestr(f"{sanitize_filename(ch_label)}.cbz", cbz_buffer.getvalue())
-                        
-                        progress_bar.progress((i + 1) / len(sorted_selected))
-                        time.sleep(0.1) # Jeda minimal untuk stabilitas
-
-                status_text.success(f"✅ Berhasil memproses {len(selected)} chapter!")
+        if btn_start:
+            if not selected:
+                status_area.error("Pilih chapter dulu!")
+            else:
+                main_zip_buffer = BytesIO()
+                sorted_sel = sorted(selected, key=extract_number)
                 
-                def get_data():
-                    return zip_buffer.getvalue()
-                
-                st.download_button(
-                    label="📥 DOWNLOAD SEKARANG",
-                    data=get_data,  # Memberikan fungsi, bukan data mentah
-                    file_name=final_zip_name,
-                    mime="application/zip",
-                    use_container_width=True
-                )
+                # Penamaan file
+                nums = [extract_number(s) for s in sorted_sel]
+                range_nm = f"Ch_{nums[0]}" if len(nums) == 1 else f"Ch_{nums[0]}-{nums[-1]}"
+                final_nm = f"{sanitize_filename(m_info['title'])}_{range_nm}.zip"
+
+                try:
+                    with zipfile.ZipFile(main_zip_buffer, "w", zipfile.ZIP_DEFLATED) as main_zip:
+                        for i, label in enumerate(sorted_sel):
+                            status_area.text(f"⏳ Mendownload {label}...")
+                            prog_bar.progress((i + 1) / len(sorted_sel))
+                            
+                            ch_id = m_info['map'][label]
+                            res = session.get(f"https://api.shngm.io/v1/chapter/detail/{ch_id}", headers=HEADERS, timeout=30).json()["data"]
+                            urls = [res["base_url"] + res["chapter"]["path"] + img for img in res["chapter"]["data"]]
+
+                            with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
+                                img_results = list(ex.map(fetch_image, urls))
+
+                            # Buat CBZ (ZIP mentah)
+                            cbz_buffer = BytesIO()
+                            with zipfile.ZipFile(cbz_buffer, "w", zipfile.ZIP_STORED) as cbz:
+                                for idx, img_bytes in enumerate(img_results):
+                                    if img_bytes:
+                                        cbz.writestr(f"{idx+1:03d}.jpg", img_bytes)
+                            
+                            main_zip.writestr(f"{sanitize_filename(label)}.cbz", cbz_buffer.getvalue())
+                            time.sleep(0.1)
+
+                    status_area.success(f"✅ Selesai! {len(selected)} Chapter siap.")
+                    
+                    # Tombol Download Final
+                    dl_area.download_button(
+                        label=f"📥 KLIK UNTUK SIMPAN ZIP",
+                        data=main_zip_buffer.getvalue(),
+                        file_name=final_nm,
+                        mime="application/zip",
+                        use_container_width=True
+                    )
+                except Exception as e:
+                    status_area.error(f"Terjadi kesalahan: {e}")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
