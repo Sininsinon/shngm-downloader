@@ -8,33 +8,25 @@ import concurrent.futures
 # --- CONFIG ---
 st.set_page_config(page_title="SHNGM Downloader", page_icon="📖", layout="centered")
 
-# --- CUSTOM CSS DENGAN PALET WARNA KHUSUS ---
-# #181C14 (Darkest), #3C3D37 (Dark Gray), #697565 (Muted Green), #ECDFCC (Cream)
+# --- CUSTOM CSS (PALET WARNA: #181C14, #3C3D37, #697565, #ECDFCC) ---
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 
-    /* Global Background & Text */
     .stApp {{
         background-color: #181C14 !important;
         color: #ECDFCC !important;
         font-family: 'Inter', sans-serif !important;
     }}
 
-    /* Input Field */
     .stTextInput input {{
         background-color: #3C3D37 !important;
         color: #ECDFCC !important;
         border: 1px solid #697565 !important;
         border-radius: 12px !important;
         height: 48px !important;
-        font-size: 16px !important;
     }}
-    .stTextInput input::placeholder {{
-        color: #697565 !important;
-    }}
-
-    /* Tombol Utama (Cari & Download) */
+    
     .stButton > button {{
         background-color: #697565 !important;
         color: #ECDFCC !important;
@@ -42,15 +34,23 @@ st.markdown(f"""
         border: none !important;
         font-weight: 600 !important;
         height: 48px !important;
-        transition: all 0.3s ease !important;
+        transition: all 0.2s ease !important;
     }}
+
     .stButton > button:hover {{
         background-color: #ECDFCC !important;
         color: #181C14 !important;
-        transform: translateY(-2px) !important;
     }}
 
-    /* Tombol Pilih & Hapus (Secondary) */
+    .manga-card {{
+        background-color: #3C3D37;
+        padding: 20px;
+        border-radius: 16px;
+        border: 1px solid #697565;
+        margin-bottom: 20px;
+        text-align: center;
+    }}
+
     .sub-btn .stButton > button {{
         height: 38px !important;
         font-size: 13px !important;
@@ -58,40 +58,24 @@ st.markdown(f"""
         border: 1px solid #697565 !important;
     }}
 
-    /* Manga Card */
-    .manga-card {{
-        background-color: #3C3D37;
-        padding: 20px;
-        border-radius: 16px;
-        border: 1px solid #697565;
-        margin-bottom: 20px;
-        color: #ECDFCC;
+    .stDownloadButton > button {{
+        background-color: #ECDFCC !important;
+        color: #181C14 !important;
+        height: 52px !important;
+        font-size: 15px !important;
+        margin-bottom: 12px !important;
+        border: 2px solid #697565 !important;
     }}
 
-    /* Multiselect / Tags */
-    span[data-baseweb="tag"] {{
-        background-color: #697565 !important;
-        color: #ECDFCC !important;
-    }}
-    
-    /* Progress Bar */
     div[data-testid="stProgress"] > div > div > div > div {{
         background-color: #ECDFCC !important;
     }}
 
-    /* Typography */
-    h1, h2, h3, p, label {{
-        color: #ECDFCC !important;
-    }}
-
-    /* Radio Button */
-    div[data-testid="stRadio"] label {{
-        color: #ECDFCC !important;
-    }}
+    h1, h2, h3, p, label {{ color: #ECDFCC !important; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- HELPER FUNCTIONS ---
+# --- FUNCTIONS ---
 HEADERS = {"User-Agent": "Mozilla/5.0", "Referer": "https://shngm.io/"}
 
 def sanitize_filename(name):
@@ -107,20 +91,20 @@ def fetch_image(url):
         return r.content if r.status_code == 200 else None
     except: return None
 
-# --- UI LAYOUT ---
+# --- UI CONTENT ---
 st.markdown("<h1 style='text-align: center;'>📖 SHNGM <span style='color: #697565;'>Downloader</span></h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; opacity: 0.8;'>Simple & Professional Manga Downloader</p>", unsafe_allow_html=True)
 
 if 'manga_data' not in st.session_state: st.session_state.manga_data = None
 if 'sel_ch' not in st.session_state: st.session_state.sel_ch = []
+if 'dl_list' not in st.session_state: st.session_state.dl_list = []
 
-# --- SEARCH ---
+# SEARCH BAR
 col_in, col_sr = st.columns([3, 1])
-m_id = col_in.text_input("ID Manga", placeholder="Masukkan ID Manga...", label_visibility="collapsed")
+m_id = col_in.text_input("ID Manga", placeholder="Masukkan ID...", label_visibility="collapsed")
 
 if col_sr.button("🔍 CARI", use_container_width=True):
     try:
-        with st.spinner("Searching..."):
+        with st.spinner("Wait..."):
             m_res = requests.get(f"https://api.shngm.io/v1/manga/detail/{m_id}", headers=HEADERS).json()
             c_res = requests.get(f"https://api.shngm.io/v1/chapter/{m_id}/list?page=1&page_size=1500", headers=HEADERS).json()
             st.session_state.manga_data = {
@@ -129,19 +113,12 @@ if col_sr.button("🔍 CARI", use_container_width=True):
                 "map": {f"Ch {c['chapter_number']}": c["chapter_id"] for c in c_res["data"]}
             }
             st.session_state.sel_ch = []
-    except:
-        st.error("Gagal! ID tidak valid.")
+            st.session_state.dl_list = []
+    except: st.error("ID Tidak ditemukan!")
 
-# --- CONTENT ---
 if st.session_state.manga_data:
     m = st.session_state.manga_data
-    
-    st.markdown(f"""
-    <div class='manga-card'>
-        <small style='color: #697565;'>MANGA SELECTED</small>
-        <h2 style='margin:0;'>{m['title']}</h2>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f"<div class='manga-card'><h2>{m['title']}</h2></div>", unsafe_allow_html=True)
 
     order = st.radio("Urutan:", ["Ascending", "Descending"], horizontal=True)
     is_desc = (order == "Descending")
@@ -157,49 +134,70 @@ if st.session_state.manga_data:
 
     selected = st.multiselect("Daftar Chapter:", current_labels, key="sel_ch")
 
-    # --- PROCESS ---
-    if st.button("🚀 MULAI DOWNLOAD (.CBZ)", use_container_width=True):
+    # DOWNLOAD LOGIC (BATCH 5 CHAPTER)
+    if st.button("🚀 MULAI PROSES BATCH", use_container_width=True):
         if not selected:
-            st.warning("Pilih chapter!")
+            st.warning("Pilih chapter dulu!")
         else:
-            main_zip = BytesIO()
+            st.session_state.dl_list = [] # Reset list download
+            # Pastikan urutan selalu dari angka terkecil agar pembagian batch konsisten
             sorted_sel = sorted(selected, key=extract_number)
             
+            # Pembagian 5 chapter per grup
+            batch_size = 5
+            batches = [sorted_sel[i:i + batch_size] for i in range(0, len(sorted_sel), batch_size)]
+            
+            total_ch = len(sorted_sel)
+            count = 0
             pbar = st.progress(0)
-            st_text = st.empty()
+            status = st.empty()
 
             try:
-                with zipfile.ZipFile(main_zip, "w") as m_zip:
-                    for i, label in enumerate(sorted_sel):
-                        st_text.markdown(f"⏳ **Processing:** `{label}`")
-                        ch_id = m['map'][label]
-                        
-                        res = requests.get(f"https://api.shngm.io/v1/chapter/detail/{ch_id}", headers=HEADERS).json()["data"]
-                        urls = [res["base_url"] + res["chapter"]["path"] + img for img in res["chapter"]["data"]]
+                for b_idx, batch in enumerate(batches):
+                    batch_zip = BytesIO()
+                    with zipfile.ZipFile(batch_zip, "w") as m_zip:
+                        for label in batch:
+                            status.markdown(f"⏳ **Batch {b_idx+1}** - Processing: `{label}`")
+                            ch_id = m['map'][label]
+                            
+                            res = requests.get(f"https://api.shngm.io/v1/chapter/detail/{ch_id}", headers=HEADERS).json()["data"]
+                            urls = [res["base_url"] + res["chapter"]["path"] + img for img in res["chapter"]["data"]]
 
-                        with concurrent.futures.ThreadPoolExecutor(max_workers=15) as ex:
-                            imgs = list(ex.map(fetch_image, urls))
+                            with concurrent.futures.ThreadPoolExecutor(max_workers=15) as ex:
+                                imgs = list(ex.map(fetch_image, urls))
 
-                        cbz_buf = BytesIO()
-                        with zipfile.ZipFile(cbz_buf, "w") as c_zip:
-                            for idx, img in enumerate(imgs):
-                                if img: c_zip.writestr(f"{idx+1:03d}.jpg", img)
-                        
-                        m_zip.writestr(f"{sanitize_filename(label)}.cbz", cbz_buf.getvalue())
-                        pbar.progress((i + 1) / len(sorted_sel))
+                            cbz_buf = BytesIO()
+                            with zipfile.ZipFile(cbz_buf, "w") as c_zip:
+                                for i, img in enumerate(imgs):
+                                    if img: c_zip.writestr(f"{i+1:03d}.jpg", img)
+                            
+                            m_zip.writestr(f"{sanitize_filename(label)}.cbz", cbz_buf.getvalue())
+                            count += 1
+                            pbar.progress(count / total_ch)
+                    
+                    # Simpan data batch ke session state (Deferred Download)
+                    file_range = f"{batch[0]}-{batch[-1]}"
+                    st.session_state.dl_list.append({
+                        "filename": f"{sanitize_filename(m['title'])}_{file_range}.zip",
+                        "data": batch_zip.getvalue(),
+                        "label": f"📥 DOWNLOAD {file_range}"
+                    })
                 
-                st_text.success(f"✅ Selesai memproses {len(sorted_sel)} Chapter!")
-                
-                # POPUP DOWNLOAD INSTAN (Fast Output)
-                zip_ready = main_zip.getvalue()
-                st.download_button(
-                    label="📥 SIMPAN FILE ZIP",
-                    data=zip_ready,
-                    file_name=f"{sanitize_filename(m['title'])}.zip",
-                    mime="application/zip",
-                    use_container_width=True
-                )
+                status.success(f"✅ Berhasil! {len(batches)} File ZIP siap diunduh.")
             except Exception as e:
                 st.error(f"Error: {e}")
 
-st.markdown("<br><p style='text-align: center; color: #697565; font-size: 12px;'>SHNGM Downloader Tool</p>", unsafe_allow_html=True)
+    # TAMPILKAN TOMBOL DOWNLOAD PER BATCH
+    if st.session_state.dl_list:
+        st.markdown("<hr>", unsafe_allow_html=True)
+        st.subheader("Pilih File untuk Disimpan:")
+        for item in st.session_state.dl_list:
+            st.download_button(
+                label=item["label"],
+                data=item["data"],
+                file_name=item["filename"],
+                mime="application/zip",
+                use_container_width=True
+            )
+
+st.markdown("<br><p style='text-align: center; color: #697565; font-size: 11px;'>Simple Batch Downloader (Max 5 Ch/File)</p>", unsafe_allow_html=True)
