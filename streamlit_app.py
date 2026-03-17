@@ -46,7 +46,7 @@ st.markdown(f"""
 
     /* PERBAIKAN TOMBOL DOWNLOAD AGAR TIDAK TABRAKAN */
     .stDownloadButton > button {{ 
-        background-color: #ECDFCC !important; 
+        background-color: #697565 !important; 
         color: #181C14 !important; 
         font-size: 14px !important; 
         font-weight: 700 !important; 
