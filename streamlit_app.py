@@ -9,7 +9,6 @@ import concurrent.futures
 st.set_page_config(page_title="SHNGM Downloader", page_icon="📖", layout="centered")
 
 # --- CSS & JAVASCRIPT (ANTI-SLEEP) ---
-# Menghapus 'f' sebelum kutip tiga agar kurung kurawal CSS/JS tidak dianggap variabel Python
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -38,25 +37,27 @@ st.markdown("""
         background-color: #3C3D37; padding: 15px; border-radius: 12px; 
         border-left: 5px solid #697565; margin-bottom: 20px; 
     }
+
+    .guide-box {
+        background-color: #2E3025; padding: 15px; border-radius: 10px;
+        border: 1px dashed #697565; margin-bottom: 20px; font-size: 14px;
+    }
     
     div[data-testid="stProgress"] > div > div > div > div { background-color: #ECDFCC !important; }
     h1, h2, h3, p, label { color: #ECDFCC !important; }
     </style>
 
     <script>
+    // ANTI-SLEEP SCRIPT
     let wakeLock = null;
-
     const requestWakeLock = async () => {
       try {
         wakeLock = await navigator.wakeLock.request('screen');
-        console.log('Wake Lock is active');
       } catch (err) {
         console.error(`${err.name}, ${err.message}`);
       }
     };
-
     requestWakeLock();
-
     document.addEventListener('visibilitychange', async () => {
       if (wakeLock !== null && document.visibilityState === 'visible') {
         await requestWakeLock();
@@ -87,10 +88,20 @@ if 'dl_list' not in st.session_state: st.session_state.dl_list = []
 
 # --- UI ---
 st.markdown("<h1 style='text-align: center;'>📖 SHNGM</h1>", unsafe_allow_html=True)
-st.info("💡 Mode Anti-Sleep Aktif: Layar tidak akan mati selama tab ini terbuka.")
+
+# --- PANDUAN AMBIL ID ---
+st.markdown("""
+<div class='guide-box'>
+    <b>Cara Mengambil ID Komik:</b><br>
+    1. Buka situs <a href='https://c.shinigami.asia' style='color:#697565'>c.shinigami.asia</a> dan pilih komik.<br>
+    2. Lihat alamat (URL) komik tersebut di bagian atas browser.<br>
+    3. Salin kode unik setelah tulisan <code>/series/</code>.<br>
+    <b>Contoh:</b> <code>.../series/b5f07831-f952-4919-af7c-aae4cadeb607</code>
+</div>
+""", unsafe_allow_html=True)
 
 col_in, col_sr = st.columns([3, 1])
-m_id = col_in.text_input("Manga ID", placeholder="Masukkan ID...", label_visibility="collapsed")
+m_id = col_in.text_input("Manga ID", placeholder="Tempel ID di sini...", label_visibility="collapsed")
 
 if col_sr.button("🔍 CARI"):
     if m_id:
@@ -114,7 +125,7 @@ if col_sr.button("🔍 CARI"):
 
 if st.session_state.manga_data:
     m = st.session_state.manga_data
-    st.markdown(f"<div class='manga-card'><small style='color:#697565'>Judul:</small><br><b>{m['title']}</b></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='manga-card'><small style='color:#697565'>Judul Terdeteksi:</small><br><b>{m['title']}</b></div>", unsafe_allow_html=True)
 
     mode = st.radio("Mode Pilih:", ["Manual", "Batch (Rentang)"], horizontal=True)
     
@@ -191,4 +202,4 @@ if st.session_state.manga_data:
                 key=item["filename"]
             )
 
-st.markdown("<br><p style='text-align: center; color: #697565; font-size: 11px;'>Simple • Fast • Anti-Sleep Active</p>", unsafe_allow_html=True)
+st.markdown("<br><p style='text-align: center; color: #697565; font-size: 11px;'>Simple • Fast • No Sleep Mode Active</p>", unsafe_allow_html=True)
