@@ -9,61 +9,54 @@ import concurrent.futures
 st.set_page_config(page_title="SHNGM Downloader", page_icon="📖", layout="centered")
 
 # --- CSS & JAVASCRIPT (ANTI-SLEEP) ---
-st.markdown(f"""
+# Menghapus 'f' sebelum kutip tiga agar kurung kurawal CSS/JS tidak dianggap variabel Python
+st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-    .stApp {{ background-color: #181C14 !important; color: #ECDFCC !important; font-family: 'Inter', sans-serif !important; }}
+    .stApp { background-color: #181C14 !important; color: #ECDFCC !important; font-family: 'Inter', sans-serif !important; }
     
     /* Input Style */
-    .stTextInput input, .stNumberInput input {{ 
+    .stTextInput input, .stNumberInput input { 
         background-color: #3C3D37 !important; color: #ECDFCC !important; 
         border: 1px solid #697565 !important; border-radius: 10px !important; 
-    }}
+    }
 
     /* Tombol Style */
-    .stButton > button, .stDownloadButton > button {{ 
+    .stButton > button, .stDownloadButton > button { 
         background-color: #697565 !important; color: #ECDFCC !important; 
         border: 1px solid #697565 !important; border-radius: 10px !important; 
         font-weight: 600 !important; transition: 0.3s; width: 100%;
         height: auto !important; min-height: 48px !important; padding: 10px !important;
         white-space: normal !important; display: block !important;
-    }}
-    .stButton > button:hover, .stDownloadButton > button:hover {{ 
+    }
+    .stButton > button:hover, .stDownloadButton > button:hover { 
         background-color: #3C3D37 !important; border: 1px solid #ECDFCC !important;
         transform: translateY(-2px);
-    }}
+    }
 
-    .manga-card {{ 
+    .manga-card { 
         background-color: #3C3D37; padding: 15px; border-radius: 12px; 
         border-left: 5px solid #697565; margin-bottom: 20px; 
-    }}
+    }
     
-    /* Progress Bar */
-    div[data-testid="stProgress"] > div > div > div > div {{ background-color: #ECDFCC !important; }}
-    h1, h2, h3, p, label {{ color: #ECDFCC !important; }}
+    div[data-testid="stProgress"] > div > div > div > div { background-color: #ECDFCC !important; }
+    h1, h2, h3, p, label { color: #ECDFCC !important; }
     </style>
 
     <script>
-    // FUNGSI UNTUK MENJAGA LAYAR TETAP NYALA (WAKE LOCK)
     let wakeLock = null;
 
     const requestWakeLock = async () => {
       try {
         wakeLock = await navigator.wakeLock.request('screen');
-        console.log('Wake Lock aktif: Layar tidak akan mati.');
-        
-        wakeLock.addEventListener('release', () => {
-          console.log('Wake Lock dilepas.');
-        });
+        console.log('Wake Lock is active');
       } catch (err) {
         console.error(`${err.name}, ${err.message}`);
       }
     };
 
-    // Jalankan saat halaman dimuat
     requestWakeLock();
 
-    // Jalankan ulang jika user kembali ke tab (karena wake lock otomatis lepas jika pindah tab)
     document.addEventListener('visibilitychange', async () => {
       if (wakeLock !== null && document.visibilityState === 'visible') {
         await requestWakeLock();
@@ -94,7 +87,7 @@ if 'dl_list' not in st.session_state: st.session_state.dl_list = []
 
 # --- UI ---
 st.markdown("<h1 style='text-align: center;'>📖 SHNGM</h1>", unsafe_allow_html=True)
-st.info("💡 Mode Anti-Sleep Aktif: Layar akan tetap menyala selama tab ini terbuka.")
+st.info("💡 Mode Anti-Sleep Aktif: Layar tidak akan mati selama tab ini terbuka.")
 
 col_in, col_sr = st.columns([3, 1])
 m_id = col_in.text_input("Manga ID", placeholder="Masukkan ID...", label_visibility="collapsed")
@@ -117,7 +110,7 @@ if col_sr.button("🔍 CARI"):
                 else:
                     st.error("ID Manga tidak ditemukan.")
         except Exception as e:
-            st.error(f"Terjadi gangguan koneksi.")
+            st.error("Terjadi gangguan koneksi.")
 
 if st.session_state.manga_data:
     m = st.session_state.manga_data
@@ -184,7 +177,7 @@ if st.session_state.manga_data:
                     
                     st_info.success("✅ Proses Selesai!")
                 except Exception as e:
-                    st.error(f"Terjadi kesalahan saat build.")
+                    st.error("Terjadi kesalahan saat build.")
 
     if st.session_state.dl_list:
         st.markdown("<hr>", unsafe_allow_html=True)
