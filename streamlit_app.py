@@ -97,6 +97,7 @@ st.markdown("""
     2. Lihat alamat (URL) komik tersebut di bagian atas browser.<br>
     3. Salin kode unik setelah tulisan <code>/series/</code>.<br>
     <b>Contoh:</b> <code>.../series/b5f07831-f952-4919-af7c-aae4cadeb607</code>
+    <b>yang di ambil:</b><code> b5f07831-f952-4919-af7c-aae4cadeb607</code>
 </div>
 """, unsafe_allow_html=True)
 
