@@ -14,19 +14,16 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     .stApp { background-color: #181C14 !important; color: #ECDFCC !important; font-family: 'Inter', sans-serif !important; }
     
-    /* Input Style */
-    .stTextInput input, .stNumberInput input { 
+    .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] { 
         background-color: #3C3D37 !important; color: #ECDFCC !important; 
         border: 1px solid #697565 !important; border-radius: 10px !important; 
     }
 
-    /* Tombol Style */
     .stButton > button, .stDownloadButton > button { 
         background-color: #697565 !important; color: #ECDFCC !important; 
         border: 1px solid #697565 !important; border-radius: 10px !important; 
         font-weight: 600 !important; transition: 0.3s; width: 100%;
         height: auto !important; min-height: 48px !important; padding: 10px !important;
-        white-space: normal !important; display: block !important;
     }
     .stButton > button:hover, .stDownloadButton > button:hover { 
         background-color: #3C3D37 !important; border: 1px solid #ECDFCC !important;
@@ -48,21 +45,11 @@ st.markdown("""
     </style>
 
     <script>
-    // ANTI-SLEEP SCRIPT
     let wakeLock = null;
     const requestWakeLock = async () => {
-      try {
-        wakeLock = await navigator.wakeLock.request('screen');
-      } catch (err) {
-        console.error(`${err.name}, ${err.message}`);
-      }
+      try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
     };
     requestWakeLock();
-    document.addEventListener('visibilitychange', async () => {
-      if (wakeLock !== null && document.visibilityState === 'visible') {
-        await requestWakeLock();
-      }
-    });
     </script>
     """, unsafe_allow_html=True)
 
@@ -86,18 +73,40 @@ def fetch_image(url):
 if 'manga_data' not in st.session_state: st.session_state.manga_data = None
 if 'dl_list' not in st.session_state: st.session_state.dl_list = []
 
+# --- FRAGMENT: DOWNLOAD AREA (SOLUSI ANTI NARIK DATA SEKALIGUS) ---
+@st.fragment
+def render_download_area():
+    if st.session_state.dl_list:
+        st.markdown("<hr>", unsafe_allow_html=True)
+        st.subheader("📁 Hasil Download:")
+        
+        # Menggunakan selectbox agar browser hanya me-load satu data file yang dipilih saja
+        file_options = [item["filename"] for item in st.session_state.dl_list]
+        
+        st.info("Pilih batch file di bawah ini, lalu klik tombol download.")
+        selected_filename = st.selectbox("Pilih File Batch:", file_options)
+        
+        # Cari data yang sesuai dengan pilihan di selectbox
+        selected_item = next(item for item in st.session_state.dl_list if item["filename"] == selected_filename)
+        
+        # Tombol download hanya merender data milik file yang dipilih
+        st.download_button(
+            label=f"📥 Download {selected_filename}",
+            data=selected_item["data"],
+            file_name=selected_item["filename"],
+            mime="application/zip",
+            key=f"btn_{selected_filename}",
+            use_container_width=True
+        )
+        st.caption("ℹ️ Memilih file lain akan mengganti data yang siap didownload (menghemat RAM & Kuota).")
+
 # --- UI ---
 st.markdown("<h1 style='text-align: center;'>📖 SHNGM</h1>", unsafe_allow_html=True)
 
-# --- PANDUAN AMBIL ID ---
 st.markdown("""
 <div class='guide-box'>
-    <b>Cara Mengambil ID Komik:</b><br>
-    1. Buka situs <a href='https://c.shinigami.asia' style='color:#697565'>c.shinigami.asia</a> dan pilih komik.<br>
-    2. Lihat alamat (URL) komik tersebut di bagian atas browser.<br>
-    3. Salin kode unik setelah tulisan <code>/series/</code>.<br>
-    <b>Contoh:</b> <code>.../series/b5f07831-f952-4919-af7c-aae4cadeb607</code>
-    <b>yang di ambil:</b><code> b5f07831-f952-4919-af7c-aae4cadeb607</code>
+    <b>Cara Mengambil ID Komik:</b> Ambil kode unik setelah <code>/series/</code> pada URL.<br>
+    <b>Contoh:</b> <code>b5f07831-f952-4919-af7c-aae4cadeb607</code>
 </div>
 """, unsafe_allow_html=True)
 
@@ -118,10 +127,10 @@ if col_sr.button("🔍 CARI"):
                         "raw": chapters,
                         "map": {f"Ch {c['chapter_number']}": c["chapter_id"] for c in chapters}
                     }
-                    st.session_state.dl_list = []
+                    st.session_state.dl_list = [] # Reset download list saat cari baru
                 else:
                     st.error("ID Manga tidak ditemukan.")
-        except Exception as e:
+        except:
             st.error("Terjadi gangguan koneksi.")
 
 if st.session_state.manga_data:
@@ -151,10 +160,12 @@ if st.session_state.manga_data:
         if not selected:
             st.warning("Silahkan pilih chapter!")
         else:
-            prog_container = st.container()
-            with prog_container:
+            # Container untuk progress agar bisa dihapus (placeholder)
+            status_container = st.empty()
+            with status_container.container():
                 st.session_state.dl_list = [] 
                 sorted_sel = sorted(selected, key=extract_number)
+                # Membagi batch (5 chapter per file ZIP)
                 batches = [sorted_sel[i:i + 5] for i in range(0, len(sorted_sel), 5)]
                 
                 pbar = st.progress(0)
@@ -176,31 +187,25 @@ if st.session_state.manga_data:
                                 with zipfile.ZipFile(cbz_io, "w") as c_zip:
                                     for i, img in enumerate(imgs):
                                         if img: c_zip.writestr(f"{i+1:03d}.jpg", img)
+                                
                                 m_zip.writestr(f"{sanitize_filename(label)}.cbz", cbz_io.getvalue())
                         
                         l_start = batch[0].replace("Ch ", "")
                         l_end = batch[-1].replace("Ch ", "")
+                        
+                        # Simpan ke session state
                         st.session_state.dl_list.append({
                             "filename": f"{sanitize_filename(m['title'])}_Ch{l_start}-{l_end}.zip",
-                            "data": batch_io.getvalue(),
-                            "label": f"📂 Download Chapter {l_start} - {l_end}"
+                            "data": batch_io.getvalue()
                         })
                         pbar.progress((b_idx + 1) / len(batches))
                     
-                    st_info.success("✅ Proses Selesai!")
+                    status_container.empty() # Bersihkan tampilan progress
+                    st.success("✅ Proses Selesai! File siap didownload di bawah.")
                 except Exception as e:
-                    st.error("Terjadi kesalahan saat build.")
+                    st.error(f"Terjadi kesalahan: {e}")
 
-    if st.session_state.dl_list:
-        st.markdown("<hr>", unsafe_allow_html=True)
-        st.subheader("📁 Hasil Download:")
-        for item in st.session_state.dl_list:
-            st.download_button(
-                label=item["label"],
-                data=item["data"],
-                file_name=item["filename"],
-                mime="application/zip",
-                key=item["filename"]
-            )
+    # Tampilkan Area Download
+    render_download_area()
 
 st.markdown("<br><p style='text-align: center; color: #697565; font-size: 11px;'>Simple • Fast • No Sleep Mode Active</p>", unsafe_allow_html=True)
