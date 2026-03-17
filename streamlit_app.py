@@ -14,7 +14,7 @@ st.markdown("""
     html, body, [class*="st-"] {
         font-size: 13px !important; /* Font lebih kecil */
     }
-    h1 { font-size: 1.5rem !important; }
+    h1 { font-size: 2.5rem !important; }
     
     /* Tombol Spesifik (Pilih/Hapus Semua) */
     .small-btn div[data-testid="stVerticalBlock"] > div {
