@@ -8,100 +8,90 @@ import concurrent.futures
 # --- CONFIG ---
 st.set_page_config(page_title="SHNGM Downloader", page_icon="📖", layout="centered")
 
-# --- MODERN & BRIGHT STYLING ---
-st.markdown("""
+# --- CUSTOM CSS DENGAN PALET WARNA KHUSUS ---
+# #181C14 (Darkest), #3C3D37 (Dark Gray), #697565 (Muted Green), #ECDFCC (Cream)
+st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 
-    html, body, [class*="st-"] {
+    /* Global Background & Text */
+    .stApp {{
+        background-color: #181C14 !important;
+        color: #ECDFCC !important;
         font-family: 'Inter', sans-serif !important;
-        font-size: 15px;
-    }
+    }}
 
-    /* Background bersih */
-    .main {
-        background-color: #ffffff;
-    }
-    
-    /* Input Search Bar yang bersih */
-    .stTextInput input {
+    /* Input Field */
+    .stTextInput input {{
+        background-color: #3C3D37 !important;
+        color: #ECDFCC !important;
+        border: 1px solid #697565 !important;
         border-radius: 12px !important;
-        border: 2px solid #E5E7EB !important;
-        padding: 12px !important;
+        height: 48px !important;
         font-size: 16px !important;
-        transition: border 0.3s;
-    }
-    .stTextInput input:focus {
-        border-color: #3B82F6 !important;
-    }
+    }}
+    .stTextInput input::placeholder {{
+        color: #697565 !important;
+    }}
 
-    /* Styling Tombol Umum */
-    .stButton > button {
+    /* Tombol Utama (Cari & Download) */
+    .stButton > button {{
+        background-color: #697565 !important;
+        color: #ECDFCC !important;
         border-radius: 12px !important;
+        border: none !important;
         font-weight: 600 !important;
         height: 48px !important;
-        transition: all 0.2s ease !important;
-        border: none !important;
-    }
+        transition: all 0.3s ease !important;
+    }}
+    .stButton > button:hover {{
+        background-color: #ECDFCC !important;
+        color: #181C14 !important;
+        transform: translateY(-2px) !important;
+    }}
 
-    /* Tombol CARI (Biru Cerah) */
-    div[data-testid="column"] .stButton > button {
-        background-color: #3B82F6 !important;
-        color: white !important;
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2) !important;
-    }
-    div[data-testid="column"] .stButton > button:hover {
-        background-color: #2563EB !important;
-        transform: translateY(-1px);
-    }
-
-    /* Tombol Pilih & Hapus (Soft Blue) */
-    .sub-btn .stButton > button {
+    /* Tombol Pilih & Hapus (Secondary) */
+    .sub-btn .stButton > button {{
         height: 38px !important;
         font-size: 13px !important;
-        background-color: #EFF6FF !important;
-        color: #1E40AF !important;
-        border: 1px solid #DBEAFE !important;
-    }
-    .sub-btn .stButton > button:hover {
-        background-color: #DBEAFE !important;
-    }
+        background-color: #3C3D37 !important;
+        border: 1px solid #697565 !important;
+    }}
 
-    /* Tombol Download (Hijau Cerah & Segar) */
-    .stDownloadButton > button {
-        background: linear-gradient(135deg, #4ADE80 0%, #22C55E 100%) !important;
-        color: white !important;
-        box-shadow: 0 6px 20px rgba(34, 197, 94, 0.3) !important;
-        width: 100% !important;
-        height: 55px !important;
-        font-size: 17px !important;
-        border: none !important;
-    }
-    .stDownloadButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(34, 197, 94, 0.4) !important;
-    }
-
-    /* Card Hasil Pencarian */
-    .manga-card {
-        background-color: #F9FAFB;
+    /* Manga Card */
+    .manga-card {{
+        background-color: #3C3D37;
         padding: 20px;
         border-radius: 16px;
-        border: 1px solid #F3F4F6;
+        border: 1px solid #697565;
         margin-bottom: 20px;
-        text-align: center;
-    }
+        color: #ECDFCC;
+    }}
 
-    /* Multiselect Styling */
-    span[data-baseweb="tag"] {
-        background-color: #3B82F6 !important;
-        color: white !important;
-        border-radius: 6px !important;
-    }
+    /* Multiselect / Tags */
+    span[data-baseweb="tag"] {{
+        background-color: #697565 !important;
+        color: #ECDFCC !important;
+    }}
+    
+    /* Progress Bar */
+    div[data-testid="stProgress"] > div > div > div > div {{
+        background-color: #ECDFCC !important;
+    }}
+
+    /* Typography */
+    h1, h2, h3, p, label {{
+        color: #ECDFCC !important;
+    }}
+
+    /* Radio Button */
+    div[data-testid="stRadio"] label {{
+        color: #ECDFCC !important;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- LOGIC FUNCTIONS ---
+# --- HELPER FUNCTIONS ---
 HEADERS = {"User-Agent": "Mozilla/5.0", "Referer": "https://shngm.io/"}
 
 def sanitize_filename(name):
@@ -117,20 +107,20 @@ def fetch_image(url):
         return r.content if r.status_code == 200 else None
     except: return None
 
-# --- UI CONTENT ---
-st.markdown("<h1 style='text-align: center; color: #111827; margin-bottom: 5px;'>📖 SHNGM <span style='color: #3B82F6;'>Downloader</span></h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #6B7280; font-size: 15px; margin-bottom: 30px;'>Unduh koleksi manga dengan cepat & mudah</p>", unsafe_allow_html=True)
+# --- UI LAYOUT ---
+st.markdown("<h1 style='text-align: center;'>📖 SHNGM <span style='color: #697565;'>Downloader</span></h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; opacity: 0.8;'>Simple & Professional Manga Downloader</p>", unsafe_allow_html=True)
 
 if 'manga_data' not in st.session_state: st.session_state.manga_data = None
 if 'sel_ch' not in st.session_state: st.session_state.sel_ch = []
 
-# --- SEARCH BAR ---
+# --- SEARCH ---
 col_in, col_sr = st.columns([3, 1])
-m_id = col_in.text_input("ID Manga", placeholder="Tempel ID Manga di sini...", label_visibility="collapsed")
+m_id = col_in.text_input("ID Manga", placeholder="Masukkan ID Manga...", label_visibility="collapsed")
 
 if col_sr.button("🔍 CARI", use_container_width=True):
     try:
-        with st.spinner("Mengambil data..."):
+        with st.spinner("Searching..."):
             m_res = requests.get(f"https://api.shngm.io/v1/manga/detail/{m_id}", headers=HEADERS).json()
             c_res = requests.get(f"https://api.shngm.io/v1/chapter/{m_id}/list?page=1&page_size=1500", headers=HEADERS).json()
             st.session_state.manga_data = {
@@ -140,39 +130,37 @@ if col_sr.button("🔍 CARI", use_container_width=True):
             }
             st.session_state.sel_ch = []
     except:
-        st.error("Gagal! Pastikan ID Manga benar.")
+        st.error("Gagal! ID tidak valid.")
 
-# --- RESULT AREA ---
+# --- CONTENT ---
 if st.session_state.manga_data:
     m = st.session_state.manga_data
     
     st.markdown(f"""
     <div class='manga-card'>
-        <p style='margin:0; color: #6B7280; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;'>Manga Ditemukan</p>
-        <h2 style='margin:5px 0 0 0; color: #111827; font-size: 24px;'>{m['title']}</h2>
+        <small style='color: #697565;'>MANGA SELECTED</small>
+        <h2 style='margin:0;'>{m['title']}</h2>
     </div>
     """, unsafe_allow_html=True)
 
-    # Sorting & Selection
-    order = st.radio("Urutan Daftar:", ["Ascending", "Descending"], horizontal=True)
+    order = st.radio("Urutan:", ["Ascending", "Descending"], horizontal=True)
     is_desc = (order == "Descending")
     
     sorted_chapters = sorted(m['raw_chapters'], key=lambda x: float(x['chapter_number']), reverse=is_desc)
     current_labels = [f"Ch {c['chapter_number']}" for c in sorted_chapters]
 
-    # Tombol Pilih Semua / Hapus (Cerah)
     st.markdown('<div class="sub-btn">', unsafe_allow_html=True)
     c1, c2, _ = st.columns([1, 1, 1])
-    if c1.button("Pilih Semua", use_container_width=True): st.session_state.sel_ch = current_labels
-    if c2.button("Hapus Semua", use_container_width=True): st.session_state.sel_ch = []
+    if c1.button("Pilih Semua"): st.session_state.sel_ch = current_labels
+    if c2.button("Hapus Semua"): st.session_state.sel_ch = []
     st.markdown('</div>', unsafe_allow_html=True)
 
-    selected = st.multiselect("Pilih chapter untuk diunduh:", current_labels, key="sel_ch")
+    selected = st.multiselect("Daftar Chapter:", current_labels, key="sel_ch")
 
-    # --- PROSES DOWNLOAD ---
-    if st.button("🚀 MULAI DOWNLOAD", type="primary", use_container_width=True):
+    # --- PROCESS ---
+    if st.button("🚀 MULAI DOWNLOAD (.CBZ)", use_container_width=True):
         if not selected:
-            st.warning("Pilih chapter terlebih dahulu!")
+            st.warning("Pilih chapter!")
         else:
             main_zip = BytesIO()
             sorted_sel = sorted(selected, key=extract_number)
@@ -183,7 +171,7 @@ if st.session_state.manga_data:
             try:
                 with zipfile.ZipFile(main_zip, "w") as m_zip:
                     for i, label in enumerate(sorted_sel):
-                        st_text.markdown(f"**⏳ Memproses:** `{label}`")
+                        st_text.markdown(f"⏳ **Processing:** `{label}`")
                         ch_id = m['map'][label]
                         
                         res = requests.get(f"https://api.shngm.io/v1/chapter/detail/{ch_id}", headers=HEADERS).json()["data"]
@@ -200,18 +188,18 @@ if st.session_state.manga_data:
                         m_zip.writestr(f"{sanitize_filename(label)}.cbz", cbz_buf.getvalue())
                         pbar.progress((i + 1) / len(sorted_sel))
                 
-                st_text.success(f"✅ Siap! {len(sorted_sel)} Chapter berhasil diproses.")
+                st_text.success(f"✅ Selesai memproses {len(sorted_sel)} Chapter!")
                 
-                # POPUP INSTAN
+                # POPUP DOWNLOAD INSTAN (Fast Output)
                 zip_ready = main_zip.getvalue()
                 st.download_button(
-                    label="📥 SIMPAN SEBAGAI .ZIP",
+                    label="📥 SIMPAN FILE ZIP",
                     data=zip_ready,
                     file_name=f"{sanitize_filename(m['title'])}.zip",
                     mime="application/zip",
                     use_container_width=True
                 )
             except Exception as e:
-                st.error(f"Terjadi kesalahan: {e}")
+                st.error(f"Error: {e}")
 
-st.markdown("<br><br><p style='text-align: center; color: #9CA3AF; font-size: 12px;'>Simple • Modern • Fast</p>", unsafe_allow_html=True)
+st.markdown("<br><p style='text-align: center; color: #697565; font-size: 12px;'>SHNGM Downloader Tool</p>", unsafe_allow_html=True)
