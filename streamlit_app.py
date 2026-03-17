@@ -8,7 +8,18 @@ import concurrent.futures
 # --- CONFIG ---
 st.set_page_config(page_title="SHNGM Downloader", page_icon="📖", layout="centered")
 
-# --- CSS: WARNA & ANTI-TABRAKAN ---
+# --- JAVASCRIPT: PENCEGAHAN REFRESH/RELOAD ---
+# Script ini akan memunculkan peringatan jika user mencoba refresh atau tutup tab
+st.markdown("""
+    <script>
+    window.addEventListener('beforeunload', function (e) {
+        e.preventDefault();
+        e.returnValue = '';
+    });
+    </script>
+    """, unsafe_allow_html=True)
+
+# --- CSS: WARNA & UI (697565 & 3C3D37) ---
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -20,7 +31,7 @@ st.markdown(f"""
         border: 1px solid #697565 !important; border-radius: 10px !important; 
     }}
 
-    /* Tombol Style: #697565 | Hover: #3C3D37 */
+    /* Tombol Style: Dasar #697565 | Hover: #3C3D37 */
     .stButton > button, .stDownloadButton > button {{ 
         background-color: #697565 !important; color: #ECDFCC !important; 
         border: 1px solid #697565 !important; border-radius: 10px !important; 
@@ -38,7 +49,6 @@ st.markdown(f"""
         border-left: 5px solid #697565; margin-bottom: 20px; 
     }}
     
-    /* Progress Bar */
     div[data-testid="stProgress"] > div > div > div > div {{ background-color: #ECDFCC !important; }}
     h1, h2, h3, p, label {{ color: #ECDFCC !important; }}
     span[data-baseweb="tag"] {{ background-color: #697565 !important; color: #ECDFCC !important; }}
@@ -64,22 +74,21 @@ def fetch_image(url):
 # --- STATE MANAGEMENT ---
 if 'manga_data' not in st.session_state: st.session_state.manga_data = None
 if 'dl_list' not in st.session_state: st.session_state.dl_list = []
-if 'last_id' not in st.session_state: st.session_state.last_id = ""
 
 # --- UI ---
 st.markdown("<h1 style='text-align: center;'>📖 SHNGM</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #697565;'>Manga Downloader • Batch 5 Chapter</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #697565; margin-top:-10px;'>Manga Downloader • Anti-Refresh System</p>", unsafe_allow_html=True)
 
 col_in, col_sr = st.columns([3, 1])
-m_id = col_in.text_input("Manga ID", placeholder="Masukkan ID...", label_visibility="collapsed")
+m_id = col_in.text_input("Manga ID", placeholder="Input ID...", label_visibility="collapsed")
 
-# Logika Pencarian yang Diperbaiki
+# Tombol Cari dengan Proteksi Pesan Error
 if col_sr.button("🔍 CARI"):
     if m_id:
         try:
-            with st.spinner("Mengambil data..."):
+            with st.spinner("Mencari..."):
                 m_res = requests.get(f"https://api.shngm.io/v1/manga/detail/{m_id}", headers=HEADERS).json()
-                if "data" in m_res:
+                if m_res.get("data"):
                     c_res = requests.get(f"https://api.shngm.io/v1/chapter/{m_id}/list?page=1&page_size=1500", headers=HEADERS).json()
                     chapters = sorted(c_res["data"], key=lambda x: float(x['chapter_number']))
                     
@@ -88,21 +97,18 @@ if col_sr.button("🔍 CARI"):
                         "raw": chapters,
                         "map": {f"Ch {c['chapter_number']}": c["chapter_id"] for c in chapters}
                     }
-                    st.session_state.dl_list = [] # Reset download jika cari manga baru
-                    st.session_state.last_id = m_id
+                    st.session_state.dl_list = []
                 else:
-                    st.error("ID Manga tidak ditemukan di database.")
-        except Exception as e:
-            st.error(f"Terjadi gangguan koneksi.")
-    else:
-        st.warning("Masukkan ID terlebih dahulu.")
+                    st.error("ID Manga tidak ditemukan.")
+        except:
+            st.error("Gagal terhubung ke server.")
 
 # --- KONTEN SETELAH BERHASIL CARI ---
 if st.session_state.manga_data:
     m = st.session_state.manga_data
     st.markdown(f"<div class='manga-card'><small style='color:#697565'>Judul:</small><br><b>{m['title']}</b></div>", unsafe_allow_html=True)
 
-    mode = st.radio("Mode Pilih:", ["Manual", "Batch (Rentang)"], horizontal=True)
+    mode = st.radio("Metode Seleksi:", ["Manual", "Batch (Rentang)"], horizontal=True)
     
     selected = []
     if mode == "Manual":
@@ -112,73 +118,68 @@ if st.session_state.manga_data:
         c1, c2 = st.columns(2)
         if c1.button("Pilih Semua"): st.session_state.msel = current_labels
         if c2.button("Hapus Semua"): st.session_state.msel = []
-        selected = st.multiselect("Pilih Chapter:", current_labels, key="msel")
+        selected = st.multiselect("Pilih Ch:", current_labels, key="msel")
     else:
         nums = [float(c['chapter_number']) for c in m['raw']]
         col_b1, col_b2 = st.columns(2)
-        s_ch = col_b1.number_input("Mulai Ch:", min_value=min(nums), max_value=max(nums), value=min(nums))
-        e_ch = col_b2.number_input("Sampai Ch:", min_value=min(nums), max_value=max(nums), value=max(nums))
+        s_ch = col_b1.number_input("Mulai:", min_value=min(nums), max_value=max(nums), value=min(nums))
+        e_ch = col_b2.number_input("Sampai:", min_value=min(nums), max_value=max(nums), value=max(nums))
         selected = [f"Ch {c['chapter_number']}" for c in m['raw'] if s_ch <= float(c['chapter_number']) <= e_ch]
         st.info(f"💡 {len(selected)} Chapter terpilih")
 
     # --- PROSES BUILD ---
     if st.button("🚀 MULAI PROSES SEKARANG", type="primary"):
         if not selected:
-            st.warning("Silahkan pilih chapter!")
+            st.warning("Pilih chapter dulu!")
         else:
-            # Container untuk progress agar tidak berantakan
-            prog_container = st.container()
-            with prog_container:
-                st.session_state.dl_list = [] # Reset hasil lama
-                sorted_sel = sorted(selected, key=extract_number)
-                batches = [sorted_sel[i:i + 5] for i in range(0, len(sorted_sel), 5)]
-                
-                pbar = st.progress(0)
-                st_info = st.empty()
+            st.session_state.dl_list = [] 
+            sorted_sel = sorted(selected, key=extract_number)
+            batches = [sorted_sel[i:i + 5] for i in range(0, len(sorted_sel), 5)]
+            
+            pbar = st.progress(0)
+            st_info = st.empty()
 
-                try:
-                    for b_idx, batch in enumerate(batches):
-                        batch_io = BytesIO()
-                        with zipfile.ZipFile(batch_io, "w") as m_zip:
-                            for label in batch:
-                                st_info.markdown(f"⏳ Memproses: `{label}`")
-                                res_ch = requests.get(f"https://api.shngm.io/v1/chapter/detail/{m['map'][label]}", headers=HEADERS).json()["data"]
-                                urls = [res_ch["base_url"] + res_ch["chapter"]["path"] + img for img in res_ch["chapter"]["data"]]
-                                
-                                with concurrent.futures.ThreadPoolExecutor(max_workers=20) as ex:
-                                    imgs = list(ex.map(fetch_image, urls))
+            try:
+                for b_idx, batch in enumerate(batches):
+                    batch_io = BytesIO()
+                    with zipfile.ZipFile(batch_io, "w") as m_zip:
+                        for label in batch:
+                            st_info.markdown(f"⏳ **Batch {b_idx+1}:** Memproses `{label}`...")
+                            res_ch = requests.get(f"https://api.shngm.io/v1/chapter/detail/{m['map'][label]}", headers=HEADERS).json()["data"]
+                            urls = [res_ch["base_url"] + res_ch["chapter"]["path"] + img for img in res_ch["chapter"]["data"]]
+                            
+                            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as ex:
+                                imgs = list(ex.map(fetch_image, urls))
 
-                                cbz_io = BytesIO()
-                                with zipfile.ZipFile(cbz_io, "w") as c_zip:
-                                    for i, img in enumerate(imgs):
-                                        if img: c_zip.writestr(f"{i+1:03d}.jpg", img)
-                                m_zip.writestr(f"{sanitize_filename(label)}.cbz", cbz_io.getvalue())
-                        
-                        # Simpan ke session state
-                        l_start = batch[0].replace("Ch ", "")
-                        l_end = batch[-1].replace("Ch ", "")
-                        st.session_state.dl_list.append({
-                            "filename": f"{sanitize_filename(m['title'])}_Ch{l_start}-{l_end}.zip",
-                            "data": batch_io.getvalue(),
-                            "label": f"📂 Download Chapter {l_start} - {l_end}"
-                        })
-                        pbar.progress((b_idx + 1) / len(batches))
+                            cbz_io = BytesIO()
+                            with zipfile.ZipFile(cbz_io, "w") as c_zip:
+                                for i, img in enumerate(imgs):
+                                    if img: c_zip.writestr(f"{i+1:03d}.jpg", img)
+                            m_zip.writestr(f"{sanitize_filename(label)}.cbz", cbz_io.getvalue())
                     
-                    st_info.success("✅ Proses Selesai!")
-                except Exception as e:
-                    st.error(f"Terjadi kesalahan saat build.")
+                    # Simpan ke session state
+                    l_start, l_end = batch[0].replace("Ch ", ""), batch[-1].replace("Ch ", "")
+                    st.session_state.dl_list.append({
+                        "filename": f"{sanitize_filename(m['title'])}_Ch{l_start}-{l_end}.zip",
+                        "data": batch_io.getvalue(),
+                        "label": f"📂 Download Chapter {l_start} - {l_end}"
+                    })
+                    pbar.progress((b_idx + 1) / len(batches))
+                
+                st_info.success("✅ Selesai! Klik tombol download di bawah.")
+            except:
+                st.error("Terjadi gangguan saat memproses gambar.")
 
-    # --- TAMPILKAN TOMBOL DOWNLOAD (TANPA RELOAD PAKSA) ---
+    # --- DAFTAR DOWNLOAD (Tanpa Flicker) ---
     if st.session_state.dl_list:
         st.markdown("<hr>", unsafe_allow_html=True)
-        st.subheader("📁 Hasil Download:")
-        for item in st.session_state.dl_list:
+        for idx, item in enumerate(st.session_state.dl_list):
             st.download_button(
                 label=item["label"],
                 data=item["data"],
                 file_name=item["filename"],
                 mime="application/zip",
-                key=item["filename"] # Key unik agar tidak crash
+                key=f"dl_{idx}" # Key unik
             )
 
-st.markdown("<br><p style='text-align: center; color: #697565; font-size: 11px;'>Simple • Fast • No Reload</p>", unsafe_allow_html=True)
+st.markdown("<br><p style='text-align: center; color: #697565; font-size: 11px;'>Simple • Fast • Anti-Refresh</p>", unsafe_allow_html=True)
