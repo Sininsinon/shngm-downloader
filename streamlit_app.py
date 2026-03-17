@@ -20,8 +20,8 @@ st.markdown("""
     /* Memperbesar Search Bar & Input */
     .stTextInput input {
         font-size: 16px !important;
-        padding: 10px !important;
-        height: 45px !important;
+        padding: 12px !important;
+        height: 50px !important;
     }
 
     /* Memperbesar Tombol Cari & Tombol Utama */
