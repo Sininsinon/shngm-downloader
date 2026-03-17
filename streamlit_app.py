@@ -161,5 +161,3 @@ if st.session_state.manga_data:
                     mime="application/zip",
                     use_container_width=True
                 )
-                 except Exception as e:
-                st.error(f"Terjadi kesalahan: {e}")
