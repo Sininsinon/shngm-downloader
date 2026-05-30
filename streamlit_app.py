@@ -4,6 +4,10 @@ from io import BytesIO
 import zipfile
 import re
 import concurrent.futures
+import tempfile
+import os
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # --- CONFIG ---
 st.set_page_config(page_title="SHNGM Downloader", page_icon="📖", layout="centered")
@@ -69,6 +73,17 @@ st.markdown("""
 # --- CORE FUNCTIONS ---
 HEADERS = {"User-Agent": "Mozilla/5.0", "Referer": "https://shngm.io/"}
 
+# Setup Session dengan Retry (Agar halaman tidak bolong)
+def get_session():
+    session = requests.Session()
+    retry = Retry(total=3, backoff_factor=0.5, status_forcelist=[429, 500, 502, 503, 504])
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    return session
+
+http_session = get_session()
+
 def sanitize_filename(name):
     return re.sub(r'[\\/*?:"<>|]', "", name).strip().replace(" ", "_")
 
@@ -78,9 +93,10 @@ def extract_number(text):
 
 def fetch_image(url):
     try:
-        r = requests.get(url, headers=HEADERS, timeout=20)
+        r = http_session.get(url, headers=HEADERS, timeout=20)
         return r.content if r.status_code == 200 else None
-    except: return None
+    except: 
+        return None
 
 # --- STATE MANAGEMENT ---
 if 'manga_data' not in st.session_state: st.session_state.manga_data = None
@@ -161,14 +177,22 @@ if st.session_state.manga_data:
 
                 try:
                     for b_idx, batch in enumerate(batches):
-                        batch_io = BytesIO()
-                        with zipfile.ZipFile(batch_io, "w") as m_zip:
+                        # Bikin file zip fisik sementara di server untuk menghemat RAM
+                        tmp_dir = tempfile.mkdtemp()
+                        l_start = batch[0].replace("Ch ", "")
+                        l_end = batch[-1].replace("Ch ", "")
+                        file_name = f"{sanitize_filename(m['title'])}_Ch{l_start}-{l_end}.zip"
+                        zip_path = os.path.join(tmp_dir, file_name)
+
+                        # Tulis data ke file fisik (hardisk server)
+                        with zipfile.ZipFile(zip_path, "w") as m_zip:
                             for label in batch:
                                 st_info.markdown(f"⏳ Memproses: `{label}`")
                                 res_ch = requests.get(f"https://api.shngm.io/v1/chapter/detail/{m['map'][label]}", headers=HEADERS).json()["data"]
                                 urls = [res_ch["base_url"] + res_ch["chapter"]["path"] + img for img in res_ch["chapter"]["data"]]
                                 
-                                with concurrent.futures.ThreadPoolExecutor(max_workers=20) as ex:
+                                # Menggunakan 10 pekerja agar tidak kena rate limit/ban IP
+                                with concurrent.futures.ThreadPoolExecutor(max_workers=10) as ex:
                                     imgs = list(ex.map(fetch_image, urls))
 
                                 cbz_io = BytesIO()
@@ -177,29 +201,43 @@ if st.session_state.manga_data:
                                         if img: c_zip.writestr(f"{i+1:03d}.jpg", img)
                                 m_zip.writestr(f"{sanitize_filename(label)}.cbz", cbz_io.getvalue())
                         
-                        l_start = batch[0].replace("Ch ", "")
-                        l_end = batch[-1].replace("Ch ", "")
+                        # Simpan PATH lokasinya saja untuk keperluan streaming
                         st.session_state.dl_list.append({
-                            "filename": f"{sanitize_filename(m['title'])}_Ch{l_start}-{l_end}.zip",
-                            "data": batch_io.getvalue(),
+                            "filename": file_name,
+                            "path": zip_path,
                             "label": f"📂 Download Chapter {l_start} - {l_end}"
                         })
                         pbar.progress((b_idx + 1) / len(batches))
                     
                     st_info.success("✅ Proses Selesai!")
                 except Exception as e:
-                    st.error("Terjadi kesalahan saat build.")
+                    st.error(f"Terjadi kesalahan saat build: {e}")
 
     if st.session_state.dl_list:
         st.markdown("<hr>", unsafe_allow_html=True)
         st.subheader("📁 Hasil Download:")
         for item in st.session_state.dl_list:
-            st.download_button(
-                label=item["label"],
-                data=item["data"],
-                file_name=item["filename"],
-                mime="application/zip",
-                key=item["filename"]
-            )
+            # Pastikan file fisik belum terhapus
+            if os.path.exists(item["path"]):
+                # Baca file fisik (streaming mode), ini menghentikan Streamlit memuat file ke RAM secara paksa
+                with open(item["path"], "rb") as f:
+                    st.download_button(
+                        label=item["label"],
+                        data=f,
+                        file_name=item["filename"],
+                        mime="application/zip",
+                        key=item["filename"]
+                    )
+            else:
+                st.error(f"File {item['filename']} sudah tidak ada di server.")
+        
+        # Fitur untuk membersihkan penyimpanan server setelah selesai
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🗑️ Bersihkan Server & Mulai Baru", type="secondary"):
+            for item in st.session_state.dl_list:
+                if os.path.exists(item["path"]):
+                    os.remove(item["path"])
+            st.session_state.dl_list = []
+            st.rerun()
 
 st.markdown("<br><p style='text-align: center; color: #697565; font-size: 11px;'>Simple • Fast • No Sleep Mode Active</p>", unsafe_allow_html=True)
