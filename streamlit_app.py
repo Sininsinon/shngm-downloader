@@ -4,7 +4,6 @@ from io import BytesIO
 import zipfile
 import re
 import concurrent.futures
-import tempfile
 import os
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -162,6 +161,7 @@ if st.session_state.manga_data:
         selected = [f"Ch {c['chapter_number']}" for c in m['raw'] if s_ch <= float(c['chapter_number']) <= e_ch]
         st.info(f"💡 {len(selected)} Chapter terpilih")
 
+    # --- BAGIAN YANG KAMU TANYAKAN DIMULAI DARI SINI ---
     if st.button("🚀 MULAI PROSES SEKARANG", type="primary"):
         if not selected:
             st.warning("Silahkan pilih chapter!")
@@ -176,22 +176,23 @@ if st.session_state.manga_data:
                 st_info = st.empty()
 
                 try:
+                    # Bikin folder 'static' di server jika belum ada
+                    if not os.path.exists("static"):
+                        os.makedirs("static")
+
                     for b_idx, batch in enumerate(batches):
-                        # Bikin file zip fisik sementara di server untuk menghemat RAM
-                        tmp_dir = tempfile.mkdtemp()
                         l_start = batch[0].replace("Ch ", "")
                         l_end = batch[-1].replace("Ch ", "")
                         file_name = f"{sanitize_filename(m['title'])}_Ch{l_start}-{l_end}.zip"
-                        zip_path = os.path.join(tmp_dir, file_name)
+                        zip_path = os.path.join("static", file_name) # Simpan di folder static
 
-                        # Tulis data ke file fisik (hardisk server)
+                        # Tulis langsung ke file fisik
                         with zipfile.ZipFile(zip_path, "w") as m_zip:
                             for label in batch:
                                 st_info.markdown(f"⏳ Memproses: `{label}`")
                                 res_ch = requests.get(f"https://api.shngm.io/v1/chapter/detail/{m['map'][label]}", headers=HEADERS).json()["data"]
                                 urls = [res_ch["base_url"] + res_ch["chapter"]["path"] + img for img in res_ch["chapter"]["data"]]
                                 
-                                # Menggunakan 10 pekerja agar tidak kena rate limit/ban IP
                                 with concurrent.futures.ThreadPoolExecutor(max_workers=10) as ex:
                                     imgs = list(ex.map(fetch_image, urls))
 
@@ -201,7 +202,6 @@ if st.session_state.manga_data:
                                         if img: c_zip.writestr(f"{i+1:03d}.jpg", img)
                                 m_zip.writestr(f"{sanitize_filename(label)}.cbz", cbz_io.getvalue())
                         
-                        # Simpan PATH lokasinya saja untuk keperluan streaming
                         st.session_state.dl_list.append({
                             "filename": file_name,
                             "path": zip_path,
@@ -213,25 +213,27 @@ if st.session_state.manga_data:
                 except Exception as e:
                     st.error(f"Terjadi kesalahan saat build: {e}")
 
+    # TAMPILKAN TOMBOL DOWNLOAD MENGGUNAKAN HTML MURNI
     if st.session_state.dl_list:
         st.markdown("<hr>", unsafe_allow_html=True)
         st.subheader("📁 Hasil Download:")
         for item in st.session_state.dl_list:
-            # Pastikan file fisik belum terhapus
             if os.path.exists(item["path"]):
-                # Baca file fisik (streaming mode), ini menghentikan Streamlit memuat file ke RAM secara paksa
-                with open(item["path"], "rb") as f:
-                    st.download_button(
-                        label=item["label"],
-                        data=f,
-                        file_name=item["filename"],
-                        mime="application/zip",
-                        key=item["filename"]
-                    )
-            else:
-                st.error(f"File {item['filename']} sudah tidak ada di server.")
-        
-        # Fitur untuk membersihkan penyimpanan server setelah selesai
+                # URL default static file di Streamlit Cloud adalah /app/static/nama_file
+                file_url = f"app/static/{item['filename']}"
+                
+                # Kita gunakan tag <a> HTML biasa agar browser men-downloadnya secara native
+                html_button = f"""
+                <a href="{file_url}" download="{item['filename']}" style="text-decoration: none;">
+                    <button style="width: 100%; background-color: #697565; color: #ECDFCC; border: none; 
+                                   border-radius: 10px; font-weight: 600; padding: 12px; margin-bottom: 10px; 
+                                   cursor: pointer; transition: 0.3s; font-family: 'Inter', sans-serif;">
+                        {item['label']}
+                    </button>
+                </a>
+                """
+                st.markdown(html_button, unsafe_allow_html=True)
+
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("🗑️ Bersihkan Server & Mulai Baru", type="secondary"):
             for item in st.session_state.dl_list:
