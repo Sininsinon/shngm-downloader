@@ -18,7 +18,7 @@ st.markdown("""
     .stApp { background-color: #181C14 !important; color: #ECDFCC !important; font-family: 'Inter', sans-serif !important; }
     
     /* Input Style */
-    .stTextInput input, .stNumberInput input { 
+    .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] { 
         background-color: #3C3D37 !important; color: #ECDFCC !important; 
         border: 1px solid #697565 !important; border-radius: 10px !important; 
     }
@@ -72,7 +72,7 @@ st.markdown("""
 # --- CORE FUNCTIONS ---
 HEADERS = {"User-Agent": "Mozilla/5.0", "Referer": "https://shngm.io/"}
 
-# Setup Session dengan Retry (Agar halaman tidak bolong)
+# Setup Session dengan Retry
 def get_session():
     session = requests.Session()
     retry = Retry(total=3, backoff_factor=0.5, status_forcelist=[429, 500, 502, 503, 504])
@@ -142,7 +142,8 @@ if st.session_state.manga_data:
     m = st.session_state.manga_data
     st.markdown(f"<div class='manga-card'><small style='color:#697565'>Judul Terdeteksi:</small><br><b>{m['title']}</b></div>", unsafe_allow_html=True)
 
-    mode = st.radio("Mode Pilih:", ["Manual", "Batch (Rentang)"], horizontal=True)
+    # DITAMBAHKAN OPSI KE-3: PAKET (PER 20 CH)
+    mode = st.radio("Mode Pilih:", ["Manual", "Batch (Rentang)", "Paket (Per 20 Ch)"], horizontal=True)
     
     selected = []
     if mode == "Manual":
@@ -153,15 +154,35 @@ if st.session_state.manga_data:
         if c1.button("Pilih Semua"): st.session_state.msel = current_labels
         if c2.button("Hapus Semua"): st.session_state.msel = []
         selected = st.multiselect("Pilih Chapter:", current_labels, key="msel")
-    else:
+        
+    elif mode == "Batch (Rentang)":
         nums = [float(c['chapter_number']) for c in m['raw']]
         col_b1, col_b2 = st.columns(2)
         s_ch = col_b1.number_input("Mulai Ch:", min_value=min(nums), max_value=max(nums), value=min(nums))
         e_ch = col_b2.number_input("Sampai Ch:", min_value=min(nums), max_value=max(nums), value=max(nums))
         selected = [f"Ch {c['chapter_number']}" for c in m['raw'] if s_ch <= float(c['chapter_number']) <= e_ch]
         st.info(f"💡 {len(selected)} Chapter terpilih")
+        
+    else: # MODE PAKET (PER 20 CH)
+        sorted_raw = sorted(m['raw'], key=lambda x: float(x['chapter_number']))
+        # Memecah seluruh chapter menjadi kelompok 20
+        chunked_20 = [sorted_raw[i:i + 20] for i in range(0, len(sorted_raw), 20)]
+        
+        preset_options = []
+        preset_mapping = {}
+        for chunk in chunked_20:
+            start = chunk[0]['chapter_number']
+            end = chunk[-1]['chapter_number']
+            label = f"Chapter {start} - {end} ({len(chunk)} chapter)"
+            preset_options.append(label)
+            preset_mapping[label] = [f"Ch {c['chapter_number']}" for c in chunk]
+            
+        p_sel = st.selectbox("Pilih Paket Download:", preset_options)
+        if p_sel:
+            selected = preset_mapping[p_sel]
+            jml_zip = (len(selected) // 5) + (1 if len(selected) % 5 != 0 else 0)
+            st.info(f"💡 Memilih {len(selected)} chapter. Akan dipecah menjadi {jml_zip} file ZIP.")
 
-    # --- BAGIAN YANG KAMU TANYAKAN DIMULAI DARI SINI ---
     if st.button("🚀 MULAI PROSES SEKARANG", type="primary"):
         if not selected:
             st.warning("Silahkan pilih chapter!")
@@ -170,6 +191,8 @@ if st.session_state.manga_data:
             with prog_container:
                 st.session_state.dl_list = [] 
                 sorted_sel = sorted(selected, key=extract_number)
+                
+                # Logic pembagian 5 chapter per ZIP tetap dipertahankan
                 batches = [sorted_sel[i:i + 5] for i in range(0, len(sorted_sel), 5)]
                 
                 pbar = st.progress(0)
@@ -184,7 +207,7 @@ if st.session_state.manga_data:
                         l_start = batch[0].replace("Ch ", "")
                         l_end = batch[-1].replace("Ch ", "")
                         file_name = f"{sanitize_filename(m['title'])}_Ch{l_start}-{l_end}.zip"
-                        zip_path = os.path.join("static", file_name) # Simpan di folder static
+                        zip_path = os.path.join("static", file_name) 
 
                         # Tulis langsung ke file fisik
                         with zipfile.ZipFile(zip_path, "w") as m_zip:
@@ -209,7 +232,7 @@ if st.session_state.manga_data:
                         })
                         pbar.progress((b_idx + 1) / len(batches))
                     
-                    st_info.success("✅ Proses Selesai!")
+                    st_info.success("✅ Semua paket selesai diproses!")
                 except Exception as e:
                     st.error(f"Terjadi kesalahan saat build: {e}")
 
@@ -219,10 +242,8 @@ if st.session_state.manga_data:
         st.subheader("📁 Hasil Download:")
         for item in st.session_state.dl_list:
             if os.path.exists(item["path"]):
-                # URL default static file di Streamlit Cloud adalah /app/static/nama_file
                 file_url = f"app/static/{item['filename']}"
                 
-                # Kita gunakan tag <a> HTML biasa agar browser men-downloadnya secara native
                 html_button = f"""
                 <a href="{file_url}" download="{item['filename']}" style="text-decoration: none;">
                     <button style="width: 100%; background-color: #697565; color: #ECDFCC; border: none; 
