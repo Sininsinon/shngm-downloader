@@ -140,9 +140,18 @@ if col_sr.button("🔍 CARI"):
 
 if st.session_state.manga_data:
     m = st.session_state.manga_data
-    st.markdown(f"<div class='manga-card'><small style='color:#697565'>Judul Terdeteksi:</small><br><b>{m['title']}</b></div>", unsafe_allow_html=True)
+    total_chapters = len(m['raw']) # Menghitung total chapter yang ada
+    
+    # MENAMPILKAN JUDUL DAN TOTAL CHAPTER
+    st.markdown(f"""
+        <div class='manga-card'>
+            <small style='color:#697565'>Judul Terdeteksi:</small><br>
+            <b>{m['title']}</b><br><br>
+            <small style='color:#697565'>Total Chapter Tersedia:</small><br>
+            <b>{total_chapters} Chapter</b>
+        </div>
+    """, unsafe_allow_html=True)
 
-    # DITAMBAHKAN OPSI KE-3: PAKET (PER 20 CH)
     mode = st.radio("Mode Pilih:", ["Manual", "Batch (Rentang)", "Paket (Per 20 Ch)"], horizontal=True)
     
     selected = []
@@ -163,9 +172,8 @@ if st.session_state.manga_data:
         selected = [f"Ch {c['chapter_number']}" for c in m['raw'] if s_ch <= float(c['chapter_number']) <= e_ch]
         st.info(f"💡 {len(selected)} Chapter terpilih")
         
-    else: # MODE PAKET (PER 20 CH)
+    else: 
         sorted_raw = sorted(m['raw'], key=lambda x: float(x['chapter_number']))
-        # Memecah seluruh chapter menjadi kelompok 20
         chunked_20 = [sorted_raw[i:i + 20] for i in range(0, len(sorted_raw), 20)]
         
         preset_options = []
@@ -192,14 +200,12 @@ if st.session_state.manga_data:
                 st.session_state.dl_list = [] 
                 sorted_sel = sorted(selected, key=extract_number)
                 
-                # Logic pembagian 5 chapter per ZIP tetap dipertahankan
                 batches = [sorted_sel[i:i + 5] for i in range(0, len(sorted_sel), 5)]
                 
                 pbar = st.progress(0)
                 st_info = st.empty()
 
                 try:
-                    # Bikin folder 'static' di server jika belum ada
                     if not os.path.exists("static"):
                         os.makedirs("static")
 
@@ -209,7 +215,6 @@ if st.session_state.manga_data:
                         file_name = f"{sanitize_filename(m['title'])}_Ch{l_start}-{l_end}.zip"
                         zip_path = os.path.join("static", file_name) 
 
-                        # Tulis langsung ke file fisik
                         with zipfile.ZipFile(zip_path, "w") as m_zip:
                             for label in batch:
                                 st_info.markdown(f"⏳ Memproses: `{label}`")
@@ -223,7 +228,14 @@ if st.session_state.manga_data:
                                 with zipfile.ZipFile(cbz_io, "w") as c_zip:
                                     for i, img in enumerate(imgs):
                                         if img: c_zip.writestr(f"{i+1:03d}.jpg", img)
-                                m_zip.writestr(f"{sanitize_filename(label)}.cbz", cbz_io.getvalue())
+                                
+                                # PEMOTONGAN JUDUL AGAR NAMA FILE CBZ AMAN
+                                safe_title = sanitize_filename(m['title'])
+                                if len(safe_title) > 40:
+                                    safe_title = safe_title[:40].strip("_ ")
+                                nama_cbz = f"{safe_title}_{sanitize_filename(label)}.cbz"
+                                
+                                m_zip.writestr(nama_cbz, cbz_io.getvalue())
                         
                         st.session_state.dl_list.append({
                             "filename": file_name,
@@ -236,7 +248,6 @@ if st.session_state.manga_data:
                 except Exception as e:
                     st.error(f"Terjadi kesalahan saat build: {e}")
 
-    # TAMPILKAN TOMBOL DOWNLOAD MENGGUNAKAN HTML MURNI
     if st.session_state.dl_list:
         st.markdown("<hr>", unsafe_allow_html=True)
         st.subheader("📁 Hasil Download:")
