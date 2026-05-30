@@ -84,11 +84,12 @@ def get_session():
 http_session = get_session()
 
 def sanitize_filename(name):
-    return re.sub(r'[\\/*?:"<>|]', "", name).strip().replace(" ", "_")
+    # Dibiarkan menggunakan spasi agar nama file lebih rapi
+    return re.sub(r'[\\/*?:"<>|]', "", name).strip()
 
 def extract_number(text):
     nums = re.findall(r"(\d+\.?\d*)", str(text))
-    return float(nums[0]) if nums else 0
+    return float(nums[0]) if nums else 0.0
 
 def fetch_image(url):
     try:
@@ -140,9 +141,8 @@ if col_sr.button("🔍 CARI"):
 
 if st.session_state.manga_data:
     m = st.session_state.manga_data
-    total_chapters = len(m['raw']) # Menghitung total chapter yang ada
+    total_chapters = len(m['raw']) 
     
-    # MENAMPILKAN JUDUL DAN TOTAL CHAPTER
     st.markdown(f"""
         <div class='manga-card'>
             <small style='color:#697565'>Judul Terdeteksi:</small><br>
@@ -209,10 +209,20 @@ if st.session_state.manga_data:
                     if not os.path.exists("static"):
                         os.makedirs("static")
 
+                    # Penyiapan judul ZIP agar aman
+                    safe_title_zip = sanitize_filename(m['title'])
+                    if len(safe_title_zip) > 40:
+                        safe_title_zip = safe_title_zip[:40].strip()
+
                     for b_idx, batch in enumerate(batches):
-                        l_start = batch[0].replace("Ch ", "")
-                        l_end = batch[-1].replace("Ch ", "")
-                        file_name = f"{sanitize_filename(m['title'])}_Ch{l_start}-{l_end}.zip"
+                        l_start = extract_number(batch[0])
+                        l_end = extract_number(batch[-1])
+                        
+                        # Format angka untuk nama file ZIP (misal: Ch 01-05)
+                        str_start = f"{int(l_start):02d}" if l_start.is_integer() else str(l_start)
+                        str_end = f"{int(l_end):02d}" if l_end.is_integer() else str(l_end)
+                        
+                        file_name = f"{safe_title_zip} - Ch {str_start}-{str_end}.zip"
                         zip_path = os.path.join("static", file_name) 
 
                         with zipfile.ZipFile(zip_path, "w") as m_zip:
@@ -229,18 +239,19 @@ if st.session_state.manga_data:
                                     for i, img in enumerate(imgs):
                                         if img: c_zip.writestr(f"{i+1:03d}.jpg", img)
                                 
-                                # PEMOTONGAN JUDUL AGAR NAMA FILE CBZ AMAN
-                                safe_title = sanitize_filename(m['title'])
-                                if len(safe_title) > 40:
-                                    safe_title = safe_title[:40].strip("_ ")
-                                nama_cbz = f"{safe_title}_{sanitize_filename(label)}.cbz"
+                                # PEMBUATAN NAMA FILE CBZ (Format: C01 - Judul Manga.cbz)
+                                angka_ch = extract_number(label)
+                                str_ch = f"{int(angka_ch):02d}" if angka_ch.is_integer() else str(angka_ch)
+                                format_label = f"C{str_ch}"
+                                
+                                nama_cbz = f"{format_label} - {safe_title_zip}.cbz"
                                 
                                 m_zip.writestr(nama_cbz, cbz_io.getvalue())
                         
                         st.session_state.dl_list.append({
                             "filename": file_name,
                             "path": zip_path,
-                            "label": f"📂 Download Chapter {l_start} - {l_end}"
+                            "label": f"📂 Download Ch {str_start} - {str_end}"
                         })
                         pbar.progress((b_idx + 1) / len(batches))
                     
@@ -253,7 +264,9 @@ if st.session_state.manga_data:
         st.subheader("📁 Hasil Download:")
         for item in st.session_state.dl_list:
             if os.path.exists(item["path"]):
-                file_url = f"app/static/{item['filename']}"
+                # Mengganti spasi dengan %20 agar URL HTML valid
+                safe_url_name = item['filename'].replace(" ", "%20")
+                file_url = f"app/static/{safe_url_name}"
                 
                 html_button = f"""
                 <a href="{file_url}" download="{item['filename']}" style="text-decoration: none;">
