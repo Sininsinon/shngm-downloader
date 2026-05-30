@@ -108,11 +108,18 @@ st.markdown("<h1 style='text-align: center;'>📖 SHNGM</h1>", unsafe_allow_html
 # --- PANDUAN AMBIL ID ---
 st.markdown("""
 <div class='guide-box'>
-    <b>Cara Mengambil ID Komik:</b><br>
-    1. Buka situs <a href='https://c.shinigami.asia' style='color:#697565'>c.shinigami.asia</a> dan pilih komik.<br>
-    2. Lihat alamat (URL) komik tersebut di bagian atas browser.<br>
-    3. Salin kode unik setelah tulisan <code>/series/</code>.<br>
-    <b>Contoh:</b> <code>.../series/b5f07831-f952-4919-af7c-aae4cadeb607</code>
+    <h4 style='margin-top: 0px; margin-bottom: 10px; color: #ECDFCC;'>💡 Cara Mengambil ID Komik</h4>
+    <ol style='margin-bottom: 15px; padding-left: 20px; color: #ECDFCC;'>
+        <li>Buka web Shinigami dan masuk ke halaman profil komik yang ingin diunduh.</li>
+        <li>Lihat kolom alamat web (URL) di bagian atas browser.</li>
+        <li>Salin <b>HANYA</b> deretan kode acak di ujung link (setelah kata <code>/series/</code>).</li>
+    </ol>
+    <div style='background-color: #181C14; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 13px; word-break: break-all; border: 1px solid #3C3D37;'>
+        <span style='color: #697565;'>https://c.shinigami.asia/series/</span><b style='color: #FFD700;'>b5f07831-f952-4919-af7c-aae4cadeb607</b>
+    </div>
+    <div style='margin-top: 8px; font-size: 12px; color: #697565;'>
+        ☝️ <i>Hanya salin kode yang berwarna <b>kuning</b> di atas, lalu tempel di kotak pencarian bawah.</i>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
