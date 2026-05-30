@@ -84,7 +84,7 @@ def get_session():
 http_session = get_session()
 
 def sanitize_filename(name):
-    # Dibiarkan menggunakan spasi agar nama file lebih rapi
+    # Dibiarkan menggunakan spasi untuk format judul cantik
     return re.sub(r'[\\/*?:"<>|]', "", name).strip()
 
 def extract_number(text):
@@ -209,20 +209,23 @@ if st.session_state.manga_data:
                     if not os.path.exists("static"):
                         os.makedirs("static")
 
-                    # Penyiapan judul ZIP agar aman
-                    safe_title_zip = sanitize_filename(m['title'])
-                    if len(safe_title_zip) > 40:
-                        safe_title_zip = safe_title_zip[:40].strip()
+                    # Penyiapan judul untuk CBZ (Cantik, pakai spasi)
+                    safe_title_cbz = sanitize_filename(m['title'])
+                    if len(safe_title_cbz) > 40:
+                        safe_title_cbz = safe_title_cbz[:40].strip()
+                        
+                    # Penyiapan judul untuk ZIP (Aman untuk server web, TANPA SPASI)
+                    safe_title_zip = safe_title_cbz.replace(" ", "_")
 
                     for b_idx, batch in enumerate(batches):
                         l_start = extract_number(batch[0])
                         l_end = extract_number(batch[-1])
                         
-                        # Format angka untuk nama file ZIP (misal: Ch 01-05)
                         str_start = f"{int(l_start):02d}" if l_start.is_integer() else str(l_start)
                         str_end = f"{int(l_end):02d}" if l_end.is_integer() else str(l_end)
                         
-                        file_name = f"{safe_title_zip} - Ch {str_start}-{str_end}.zip"
+                        # FORMAT NAMA ZIP TANPA SPASI (Aman diunduh browser)
+                        file_name = f"{safe_title_zip}_Ch_{str_start}-{str_end}.zip"
                         zip_path = os.path.join("static", file_name) 
 
                         with zipfile.ZipFile(zip_path, "w") as m_zip:
@@ -239,12 +242,12 @@ if st.session_state.manga_data:
                                     for i, img in enumerate(imgs):
                                         if img: c_zip.writestr(f"{i+1:03d}.jpg", img)
                                 
-                                # PEMBUATAN NAMA FILE CBZ (Format: C01 - Judul Manga.cbz)
+                                # FORMAT NAMA CBZ DENGAN SPASI (Tetap cantik di dalam)
                                 angka_ch = extract_number(label)
                                 str_ch = f"{int(angka_ch):02d}" if angka_ch.is_integer() else str(angka_ch)
                                 format_label = f"C{str_ch}"
                                 
-                                nama_cbz = f"{format_label} - {safe_title_zip}.cbz"
+                                nama_cbz = f"{format_label} - {safe_title_cbz}.cbz"
                                 
                                 m_zip.writestr(nama_cbz, cbz_io.getvalue())
                         
@@ -264,9 +267,8 @@ if st.session_state.manga_data:
         st.subheader("📁 Hasil Download:")
         for item in st.session_state.dl_list:
             if os.path.exists(item["path"]):
-                # Mengganti spasi dengan %20 agar URL HTML valid
-                safe_url_name = item['filename'].replace(" ", "%20")
-                file_url = f"app/static/{safe_url_name}"
+                # URL sudah pasti aman dari spasi
+                file_url = f"app/static/{item['filename']}"
                 
                 html_button = f"""
                 <a href="{file_url}" download="{item['filename']}" style="text-decoration: none;">
